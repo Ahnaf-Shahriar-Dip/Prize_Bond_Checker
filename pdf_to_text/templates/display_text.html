@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Text</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #cccccc;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background-color: #007bff !important;
+        }
+
+        .navbar-brand,
+        .navbar-nav .nav-link {
+            color: #fff !important;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2 {
+            color: #333;
+            text-align: center;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-upload {
+            border: 2px solid #007bff;
+            color: #007bff;
+            background-color: transparent;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .file-upload:hover {
+            background-color: #007bff;
+            color: #fff;
+        }
+
+        #extractedText {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Added style for button container */
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        /* Style for the generate button */
+        #generateButton {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <a class="navbar-brand" href="#">PDF Text Extractor</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>Upload a PDF file</h1>
+        <form id="uploadForm" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label for="pdfFile" class="file-upload">Choose File</label>
+            <input type="file" id="pdfFile" name="pdf_file" accept="application/pdf">
+        </form>
+
+        <div id="pdfContainer" class="mt-4" style="display: none;">
+            <h2>Uploaded PDF:</h2>
+            <embed id="pdfViewer" src="" type="application/pdf" width="100%" height="600px">
+        </div>
+
+        <!-- Generate Text button -->
+        <button id="generateButton" class="btn btn-primary" style="display: none;">Generate Text</button>
+
+        <!-- Display extracted text -->
+        <div id="extractedText" class="mt-4" style="display: none;">
+            <h2>Extracted Text:</h2>
+            <pre id="editableText"></pre>
+            <div class="button-container">
+                <button id="editButton" class="btn btn-primary">Edit Text</button>
+               
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        document.getElementById('pdfFile').addEventListener('change', function (event) {
+            var file = event.target.files[0];
+            var reader = new FileReader();
+
+            reader.onload = function (e) {
+                document.getElementById('pdfViewer').src = e.target.result;
+                document.getElementById('pdfContainer').style.display = 'block';
+                document.getElementById('generateButton').style.display = 'block';
+            };
+
+            reader.readAsDataURL(file);
+        });
+
+        $('#generateButton').click(function () {
+            var file = $('#pdfFile')[0].files[0];
+            var formData = new FormData();
+            formData.append('pdf_file', file);
+            
+           
+
+            $.ajax({
+                url: '/generate_text/',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrftoken
+                },
+                success: function (response) {
+                    console.log(response); // Log response to console
+
+                    console.log('Extracted Text:', response.extracted_text);
+                    $('#extractedText').show();
+                    $('#editableText').text(response.extracted_text);
+                    $('#saveButton').show();  // Show the Save button
+                },
+                error: function (error) {
+                    console.log(error);
+                }
+            });
+        });
+
+
+
+        var csrftoken = getCookie('csrftoken');
+
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                // Check if the cookie name matches the one we're looking for
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+
+
+        $('#editButton').click(function() {
+            var $editableText = $('#editableText');
+            var isEditable = $editableText.attr('contenteditable') === 'true';
+            
+            $editableText.attr('contenteditable', !isEditable);
+            
+            if (isEditable) {
+                $(this).text('Edit Text');
+                // Hide the button after saving
+                $(this).hide();
+                $('#saveButton').hide(); // Hide the Save button
+                var extracted_number = $('#editableText').text().trim();
+                if (extracted_number) {
+                    // Send the extracted number to the server to save
+                    $.ajax({
+                        url: '/save_extracted_number/',
+                        type: 'POST',
+                        data: {
+                            'extracted_number': extracted_number,
+                            csrfmiddlewaretoken: csrftoken,
+                        },
+                        success: function (response) {
+                            console.log(response);
+                            if (response.success) {
+                                alert(response.message);
+                            } else {
+                                alert('Error saving number: ' + response.message);
+                            }
+                        },
+                        error: function (error) {
+                            console.log(error);
+                            alert('Error saving number.');
+                        }
+                    });
+                }
+            } else {
+                $(this).text('Save');
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,79 @@
+<!-- upload_image.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Image</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .image-preview {
+            margin-bottom: 20px;
+        }
+        .image-preview img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        button[type="submit"] {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Image</h1>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="image-preview" id="imagePreview">
+                <img src="#" alt="Image Preview" id="uploadedImage">
+            </div>
+            <input type="file" name="image" id="uploadImageInput" accept="image/*" onchange="previewImage(event)">
+            <button type="submit">Upload</button>
+        </form>
+    </div>
+
+    <script>
+        function previewImage(event) {
+            const preview = document.getElementById('uploadedImage');
+            const file = event.target.files[0];
+            const reader = new FileReader();
+
+            reader.onloadend = function () {
+                preview.src = reader.result;
+            }
+
+            if (file) {
+                reader.readAsDataURL(file);
+            } else {
+                preview.src = '';
+            }
+        }
+    </script>
+</body>
+</html>

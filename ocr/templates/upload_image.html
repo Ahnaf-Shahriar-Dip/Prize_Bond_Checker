@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Image</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"> <!-- Include Font Awesome CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+        }
+        .image-container,
+        .text-container {
+            width: calc(50% - 10px);
+            margin-bottom: 20px;
+        }
+        .image-preview {
+            position: relative;
+            margin-bottom: 20px;
+            width: 300px;
+        }
+        .image-preview img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        button[type="button"] {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #removeButton {
+            display: none;
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        #removeIcon {
+            color: red;
+        }
+        #extractedText p {
+            font-size: 13px;
+            font-weight: bold;
+            line-height: 1.6; 
+        }
+        #croppedImageContainer {
+            margin-bottom: 20px;
+        }
+        #croppedImageContainer h2 {
+            margin-top: 0;
+        }
+        .hidden {
+            display: none;
+        }
+
+        #croppedImage{
+            width: 300px;
+        }
+
+        .close-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: red;
+    font-size: 20px;
+}
+
+#reloadButton {
+    position: absolute;
+    top: 68px;
+    right: 265px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: red;
+    font-size: 20px;
+        }
+
+
+
+        /* Navbar styles */
+        .navbar {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .navbar-links {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .navbar-links li {
+            margin-right: 20px;
+        }
+
+        .navbar-links a {
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        .navbar-links a:hover {
+            color: #f8f9fa; /* lighter shade of white */
+        }
+
+    </style>
+</head>
+
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <span class="navbar-brand">OCR</span>
+        <ul class="navbar-links">
+            <li><a href="/">Home</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="image-container">
+            <h1>Upload Image</h1>
+            <button id="reloadButton" onclick="reloadPage()">X</button>
+
+            <div id="croppedImageContainer" class="hidden">
+                <img id="croppedImage" src="#" alt="Cropped Image">
+            </div>
+
+            <form id="uploadForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="image-preview" id="imagePreview">
+                    <img src="#" alt="Image Preview" id="cropperImage" style="display: none;">
+                    <button id="removeButton" type="button" onclick="removeImage()"><i id="removeIcon" class="fas fa-times"></i></button>
+                </div>
+                <input type="file" name="cropped_image" id="uploadImageInput" accept="image/*">
+                <button id="uploadButton" type="button" onclick="previewImage()">Upload</button>
+            </form>
+            <div class="hidden" id="cropButtons">
+                <h3>Image Cropping</h3>
+                <div>
+                    <button id="cropButton" type="button" onclick="cropImage()">Next</button>
+                </div>
+            </div>
+            <div id="ocrButtonDiv" class="hidden">
+                <h3>Perform OCR</h3>
+                <button id="ocrButton" type="button" onclick="performOCR()">Perform OCR</button>
+            </div>
+        </div>
+        <div class="text-container" id="extractedText">
+            {% if extracted_text %}
+            <h2>Extracted Text:</h2>
+            <p>{{ extracted_text }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <script>
+        function reloadPage() {
+            window.location.reload();
+        }
+
+        let cropper;
+
+        function initCropper() {
+            const cropperImage = document.getElementById('cropperImage');
+            cropper = new Cropper(cropperImage, {
+                viewMode: 1,
+                guides: true,
+                autoCropArea: 1,
+                movable: true,
+                cropBoxResizable: true,
+                cropBoxMovable: true,
+                minCropBoxWidth: 5,
+                minCropBoxHeight: 5,
+            });
+        }
+
+        function previewImage() {
+            const fileInput = document.getElementById('uploadImageInput');
+            const cropperImage = document.getElementById('cropperImage');
+            const uploadButton = document.getElementById('uploadButton');
+
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    cropperImage.src = e.target.result;
+                    cropperImage.style.display = 'block';
+                    uploadButton.classList.add('hidden');
+                    fileInput.classList.add('hidden');
+                    document.getElementById('cropButtons').classList.remove('hidden');
+                    document.getElementById('ocrButtonDiv').classList.add('hidden');
+                    document.getElementById('croppedImageContainer').classList.add('hidden');
+                    initCropper();
+
+                    // Add close button
+                    const closeButton = document.createElement('button');
+                    closeButton.innerHTML = '<i class="fas fa-times"></i>';
+                    closeButton.classList.add('close-button');
+                    closeButton.onclick = function() {
+                        window.location.reload();
+                    };
+                    document.getElementById('imagePreview').appendChild(closeButton);
+                };
+
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+
+        function cropImage() {
+            if (cropper) {
+                const croppedCanvas = cropper.getCroppedCanvas();
+                const croppedImageDataURL = croppedCanvas.toDataURL();
+                const croppedImage = document.getElementById('croppedImage');
+                const originalImageContainer = document.getElementById('imagePreview');
+
+                // Show cropped image and hide original image
+                croppedImage.src = croppedImageDataURL;
+                document.getElementById('croppedImageContainer').classList.remove('hidden');
+                originalImageContainer.style.display = 'none';
+
+                // Remove original image
+                originalImageContainer.removeChild(originalImageContainer.firstChild);
+
+                // Hide Next button and show Perform OCR button
+                document.getElementById('cropButtons').classList.add('hidden');
+                document.getElementById('ocrButtonDiv').classList.remove('hidden');
+            }
+        }
+
+        function performOCR() {
+            if (cropper) {
+                const croppedCanvas = cropper.getCroppedCanvas();
+                const croppedImageBlob = dataURLtoBlob(croppedCanvas.toDataURL());
+
+                // Append cropped image blob to FormData
+                const formData = new FormData();
+                formData.append('cropped_image', croppedImageBlob);
+
+                // Create XMLHttpRequest
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/ocr/', true);
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                
+                // Set CSRF token
+                xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
+
+                // Define onload function
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            const extractedTextContainer = document.getElementById('extractedText');
+                            extractedTextContainer.innerHTML = '<h2>Extracted Text:</h2><p>' + response.extracted_text + '</p>';
+
+                            // Create a textarea for editing the extracted text
+                            const textarea = document.createElement('textarea');
+                            textarea.value = response.extracted_text;
+                            textarea.rows = 10;
+                            textarea.cols = 50;
+                            textarea.id = 'extractedTextarea';  // Add ID to the textarea
+                            extractedTextContainer.appendChild(textarea);
+
+                            // Create a save button
+                            const saveButton = document.createElement('button');
+                            saveButton.textContent = 'Save';
+                            saveButton.onclick = function() {
+                                // Update the extracted text with the edited text
+                                const editedText = textarea.value;
+                                saveExtractedNumber(editedText);
+                            };
+                            saveButton.id = 'saveButton';  // Add ID to the save button
+                            extractedTextContainer.appendChild(saveButton);
+                        } else {
+                            alert('Error: ' + response.message);
+                        }
+                    } else {
+                        alert('Error occurred while performing OCR. Please try again.');
+                    }
+                };
+
+                // Send FormData
+                xhr.send(formData);
+            }
+        }
+
+        function saveExtractedNumber(extractedNumber) {
+            const formData = new FormData();
+            formData.append('extracted_number', extractedNumber);
+
+            // Create XMLHttpRequest
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/save_number/', true);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+            // Set CSRF token
+            xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
+
+            // Define onload function
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        alert('Number saved successfully.');
+
+                        // Remove the textarea and save button after saving
+                        const textarea = document.getElementById('extractedTextarea');
+                        const saveButton = document.getElementById('saveButton');
+                        if (textarea) {
+                            textarea.remove();
+                        }
+                        if (saveButton) {
+                            saveButton.remove();
+                        }
+
+                        // Update the displayed text with the edited text
+                        const extractedTextContainer = document.getElementById('extractedText');
+                        extractedTextContainer.querySelector('p').textContent = extractedNumber;
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                } else {
+                    alert('Error occurred while saving the number. Please try again.');
+                }
+            };
+
+            // Send FormData
+            xhr.send(formData);
+        }
+
+        function removeImage() {
+            const cropperImage = document.getElementById('cropperImage');
+            cropperImage.src = '#';
+            cropperImage.style.display = 'none';
+            const fileInput = document.getElementById('uploadImageInput');
+            fileInput.value = '';
+            document.getElementById('croppedImageContainer').classList.add('hidden');
+            document.getElementById('ocrButtonDiv').classList.add('hidden');
+            document.getElementById('cropButtons').classList.add('hidden');
+            document.getElementById('uploadButton').classList.remove('hidden');
+            fileInput.classList.remove('hidden');
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Convert data URL to Blob
+        function dataURLtoBlob(dataURL) {
+            const parts = dataURL.split(';base64,');
+            const contentType = parts[0].split(':')[1];
+            const raw = window.atob(parts[1]);
+            const rawLength = raw.length;
+            const uInt8Array = new Uint8Array(rawLength);
+
+            for (let i = 0; i < rawLength; ++i) {
+                uInt8Array[i] = raw.charCodeAt(i);
+            }
+
+            return new Blob([uInt8Array], { type: contentType });
+        }
+    </script>
+</body>
+</html>
